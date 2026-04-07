@@ -17,7 +17,8 @@ CLAUDE_CLI = os.environ.get("CLAUDE_CLI_PATH", "/config/.local/bin/claude")
 MCP_CONFIG = "/tmp/gmr-mcp.json"
 MCP_TOOLS = ",".join(f"mcp__gmr__{t}" for t in [
     "search_entities", "get_company", "get_contracts", "get_authority",
-    "explore_graph", "find_paths", "get_fundamentals", "validate_widget", "web_search",
+    "explore_graph", "find_paths", "get_fundamentals", "validate_widget",
+    "web_search", "propose_edit",
 ])
 
 SYSTEM = """You are a research assistant for the GMR EU Knowledge Graph.

@@ -12,6 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { widgetCatalogMarkdown, validateWidget } from './widgets.js'
+import { editActionsCatalogMarkdown, validateEditAction, EDIT_ACTIONS } from './edit-actions.js'
 
 const GMR_API = process.env.GMR_API_URL || 'http://gmr-api.gmr.svc.cluster.local'
 
@@ -142,7 +143,43 @@ When you think a visualization would help the user, write the widget block direc
   }),
 )
 
+server.resource(
+  'edit-actions',
+  'gmr://actions/edit',
+  async () => ({
+    contents: [{
+      uri: 'gmr://actions/edit',
+      mimeType: 'text/markdown',
+      text: editActionsCatalogMarkdown(),
+    }],
+  }),
+)
+
 // ── Tools ────────────────────────────────────────────────────────
+
+server.tool(
+  'propose_edit',
+  'Propose an edit to the current report. The user will review and approve before it is applied. Read the edit-actions resource first to see available actions.',
+  { action: z.string().describe('Edit action name'), params: z.object({}).passthrough().describe('Action parameters') },
+  async ({ action, params }) => {
+    const proposal = { action, ...params }
+    const validation = validateEditAction(proposal)
+    if (!validation.valid) {
+      return { content: [{ type: 'text', text: JSON.stringify({ proposed: false, errors: validation.errors }) }] }
+    }
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          proposed: true,
+          action: validation.action,
+          params: validation.params,
+          description: EDIT_ACTIONS[action]?.description || '',
+        }),
+      }],
+    }
+  },
+)
 
 server.tool(
   'search_entities',
