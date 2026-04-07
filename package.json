@@ -1,0 +1,17 @@
+{
+  "name": "gmr-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for the GMR EU Knowledge Graph — gives LLMs access to company, procurement, lobbying, and graph data",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "gmr-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
