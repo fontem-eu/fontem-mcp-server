@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -79,9 +80,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("X-Accel-Buffering", "no")  # Disable nginx buffering
+        self.send_header("Connection", "close")  # close after streaming
+        self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
+        self.close_connection = True
+
+        # Send initial status so the frontend knows the connection is open
+        self._send_sse("status", json.dumps({"phase": "connecting", "elapsed": 0}))
 
         try:
             loop = asyncio.new_event_loop()
@@ -117,21 +122,56 @@ class Handler(BaseHTTPRequestHandler):
             stderr=asyncio.subprocess.PIPE,
         )
 
+        start = time.time()
+        got_output = False
         buffer = ""
-        while True:
-            chunk = await asyncio.wait_for(proc.stdout.read(256), timeout=300)
-            if not chunk:
-                break
-            text = chunk.decode("utf-8", errors="replace")
-            buffer += text
-            # Send complete lines as SSE events
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                self._send_sse("chunk", json.dumps({"text": line + "\n"}))
 
-        # Send remaining buffer
-        if buffer.strip():
-            self._send_sse("chunk", json.dumps({"text": buffer}))
+        # Send heartbeat events every 2s while waiting for Claude to finish
+        # tool calls. This keeps the connection alive and gives the user feedback.
+        async def heartbeat():
+            nonlocal got_output
+            phases = [
+                (0, "thinking"),
+                (3, "searching"),
+                (8, "analyzing"),
+                (20, "synthesizing"),
+            ]
+            while not got_output:
+                elapsed = time.time() - start
+                phase = "thinking"
+                for threshold, name in phases:
+                    if elapsed >= threshold:
+                        phase = name
+                self._send_sse("status", json.dumps({
+                    "phase": phase,
+                    "elapsed": round(elapsed, 1),
+                }))
+                await asyncio.sleep(2)
+
+        heartbeat_task = asyncio.create_task(heartbeat())
+
+        try:
+            while True:
+                chunk = await asyncio.wait_for(proc.stdout.read(256), timeout=300)
+                if not chunk:
+                    break
+                if not got_output:
+                    got_output = True
+                    heartbeat_task.cancel()
+                    self._send_sse("status", json.dumps({
+                        "phase": "streaming",
+                        "elapsed": round(time.time() - start, 1),
+                    }))
+                text = chunk.decode("utf-8", errors="replace")
+                buffer += text
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    self._send_sse("chunk", json.dumps({"text": line + "\n"}))
+
+            if buffer.strip():
+                self._send_sse("chunk", json.dumps({"text": buffer}))
+        finally:
+            heartbeat_task.cancel()
 
         await proc.wait()
 
