@@ -2,6 +2,10 @@
 """
 Claude CLI proxy with MCP + SSE streaming.
 
+Uses --output-format stream-json --verbose to get structured events
+from Claude CLI, including tool use notifications. These are forwarded
+as rich SSE status events so the frontend can show real activity.
+
 Endpoints:
   POST /chat         — blocking JSON response (legacy)
   POST /chat/stream  — SSE stream (text/event-stream)
@@ -27,13 +31,41 @@ Use your MCP tools to search entities, explore the graph, and look up data.
 When asked about data, ALWAYS use your tools — don't guess.
 Be concise, cite specific numbers, and suggest widget embeds when relevant."""
 
+# Human-friendly tool descriptions for the UI
+TOOL_LABELS = {
+    "mcp__gmr__search_entities": "Searching entities",
+    "mcp__gmr__get_company": "Looking up company",
+    "mcp__gmr__get_contracts": "Fetching contracts",
+    "mcp__gmr__get_authority": "Looking up authority",
+    "mcp__gmr__explore_graph": "Exploring graph",
+    "mcp__gmr__find_paths": "Finding connections",
+    "mcp__gmr__get_fundamentals": "Loading financials",
+    "mcp__gmr__validate_widget": "Validating widget",
+    "mcp__gmr__web_search": "Searching the web",
+    "mcp__gmr__propose_edit": "Proposing report edit",
+    "ToolSearch": "Discovering tools",
+}
 
-def _build_args(message, system):
+
+def _build_args_text(message, system):
+    """Build args for blocking text output."""
     return [
         CLAUDE_CLI, "-p", message,
         "--append-system-prompt", system,
         "--mcp-config", MCP_CONFIG,
         "--allowedTools", MCP_TOOLS,
+    ]
+
+
+def _build_args_stream(message, system):
+    """Build args for streaming JSON output with tool visibility."""
+    return [
+        CLAUDE_CLI, "-p", message,
+        "--append-system-prompt", system,
+        "--mcp-config", MCP_CONFIG,
+        "--allowedTools", MCP_TOOLS,
+        "--output-format", "stream-json",
+        "--verbose",
     ]
 
 
@@ -76,17 +108,18 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _handle_stream(self, message, system):
-        """SSE streaming response — sends chunks as Claude generates them."""
+        """SSE streaming with real tool-use visibility from Claude CLI."""
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "close")  # close after streaming
+        self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
         self.close_connection = True
 
-        # Send initial status so the frontend knows the connection is open
-        self._send_sse("status", json.dumps({"phase": "connecting", "elapsed": 0}))
+        self._send_sse("status", json.dumps({
+            "phase": "connecting", "detail": "Starting assistant...", "elapsed": 0,
+        }))
 
         try:
             loop = asyncio.new_event_loop()
@@ -106,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
 
     async def _call_blocking(self, message, system):
         proc = await asyncio.create_subprocess_exec(
-            *_build_args(message, system),
+            *_build_args_text(message, system),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -116,62 +149,108 @@ class Handler(BaseHTTPRequestHandler):
         return {"content": stdout.decode().strip()}
 
     async def _stream_claude(self, message, system):
+        start = time.time()
         proc = await asyncio.create_subprocess_exec(
-            *_build_args(message, system),
+            *_build_args_stream(message, system),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        start = time.time()
-        got_output = False
+        self._send_sse("status", json.dumps({
+            "phase": "thinking", "detail": "Processing your request...",
+            "elapsed": round(time.time() - start, 1),
+        }))
+
         buffer = ""
+        tool_calls = 0
+        streaming_started = False
 
-        # Send heartbeat events every 2s while waiting for Claude to finish
-        # tool calls. This keeps the connection alive and gives the user feedback.
-        async def heartbeat():
-            nonlocal got_output
-            phases = [
-                (0, "thinking"),
-                (3, "searching"),
-                (8, "analyzing"),
-                (20, "synthesizing"),
-            ]
-            while not got_output:
-                elapsed = time.time() - start
-                phase = "thinking"
-                for threshold, name in phases:
-                    if elapsed >= threshold:
-                        phase = name
-                self._send_sse("status", json.dumps({
-                    "phase": phase,
-                    "elapsed": round(elapsed, 1),
-                }))
-                await asyncio.sleep(2)
+        while True:
+            chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=300)
+            if not chunk:
+                break
+            buffer += chunk.decode("utf-8", errors="replace")
 
-        heartbeat_task = asyncio.create_task(heartbeat())
+            # Process complete JSON lines
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
 
-        try:
-            while True:
-                chunk = await asyncio.wait_for(proc.stdout.read(256), timeout=300)
-                if not chunk:
-                    break
-                if not got_output:
-                    got_output = True
-                    heartbeat_task.cancel()
-                    self._send_sse("status", json.dumps({
-                        "phase": "streaming",
-                        "elapsed": round(time.time() - start, 1),
-                    }))
-                text = chunk.decode("utf-8", errors="replace")
-                buffer += text
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    self._send_sse("chunk", json.dumps({"text": line + "\n"}))
+                try:
+                    event = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
 
-            if buffer.strip():
-                self._send_sse("chunk", json.dumps({"text": buffer}))
-        finally:
-            heartbeat_task.cancel()
+                etype = event.get("type", "")
+                elapsed = round(time.time() - start, 1)
+
+                if etype == "assistant":
+                    msg = event.get("message", {})
+                    for block in msg.get("content", []):
+                        btype = block.get("type", "")
+
+                        if btype == "tool_use":
+                            tool_calls += 1
+                            tool_name = block.get("name", "")
+                            tool_input = block.get("input", {})
+                            label = TOOL_LABELS.get(tool_name, tool_name)
+
+                            # Build a human-friendly detail string
+                            query = (tool_input.get("query") or
+                                     tool_input.get("gmr_id") or
+                                     tool_input.get("entity_id") or "")
+                            detail = f"{label}"
+                            if query:
+                                detail += f': "{query}"'
+
+                            self._send_sse("status", json.dumps({
+                                "phase": "tool_use",
+                                "tool": tool_name,
+                                "detail": detail,
+                                "elapsed": elapsed,
+                            }))
+
+                        elif btype == "text":
+                            text = block.get("text", "")
+                            if text:
+                                if not streaming_started:
+                                    streaming_started = True
+                                    self._send_sse("status", json.dumps({
+                                        "phase": "streaming",
+                                        "detail": "Writing response...",
+                                        "elapsed": elapsed,
+                                    }))
+                                # Send text in chunks (split by newlines for granularity)
+                                for text_line in text.split("\n"):
+                                    self._send_sse("chunk", json.dumps({
+                                        "text": text_line + "\n",
+                                    }))
+
+                elif etype == "result":
+                    # Final result — if we haven't streamed text yet, extract it
+                    result_text = event.get("result", "")
+                    if not streaming_started and result_text:
+                        self._send_sse("status", json.dumps({
+                            "phase": "streaming",
+                            "detail": "Writing response...",
+                            "elapsed": elapsed,
+                        }))
+                        self._send_sse("chunk", json.dumps({
+                            "text": result_text,
+                        }))
+
+        # Process any remaining buffer
+        if buffer.strip():
+            try:
+                event = json.loads(buffer.strip())
+                if event.get("type") == "result":
+                    result_text = event.get("result", "")
+                    if not streaming_started and result_text:
+                        self._send_sse("chunk", json.dumps({"text": result_text}))
+            except (json.JSONDecodeError, ValueError):
+                pass
 
         await proc.wait()
 
