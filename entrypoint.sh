@@ -3,7 +3,7 @@
 #
 # Responsibilities (in order):
 #   1. Ensure $HOME/.claude exists and is writable (PVC mount).
-#   2. Seed $HOME/.claude/credentials.json from the read-only Secret mount
+#   2. Seed $HOME/.claude/.credentials.json from the read-only Secret mount
 #      the FIRST time the container boots against an empty PVC. On any
 #      subsequent restart the PVC already holds the most recently refreshed
 #      OAuth tokens, so we leave them alone.
@@ -16,11 +16,16 @@
 #   pod restart, so we'd re-seed from the Secret (which holds the original
 #   now-rotated-and-invalid RT). A PVC persists the refreshed tokens across
 #   pod lifecycles. The Secret is just a one-time bootstrap.
+#
+# Why the leading dot in .credentials.json:
+#   That's where the Claude CLI stores its OAuth state. The k8s Secret uses
+#   the non-dotted key "credentials.json" for readability (dotted keys are
+#   awkward in yaml and kubectl output), and we rename on seed.
 
 set -eu
 
 CLAUDE_DIR="${HOME}/.claude"
-CLAUDE_CREDS="${CLAUDE_DIR}/credentials.json"
+CLAUDE_CREDS="${CLAUDE_DIR}/.credentials.json"
 SECRET_CREDS="/run/secrets/claude/credentials.json"
 MCP_CONFIG="/tmp/gmr-mcp.json"
 
