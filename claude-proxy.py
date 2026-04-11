@@ -240,6 +240,17 @@ class Handler(BaseHTTPRequestHandler):
                         self._send_sse("chunk", json.dumps({
                             "text": result_text,
                         }))
+                    # Forward real token usage so callers can bill accurately.
+                    # Claude CLI's stream-json result event carries a
+                    # {"usage": {"input_tokens": N, "output_tokens": N}} block.
+                    usage = event.get("usage") or {}
+                    inp = usage.get("input_tokens")
+                    out = usage.get("output_tokens")
+                    if isinstance(inp, int) and isinstance(out, int):
+                        self._send_sse("usage", json.dumps({
+                            "input_tokens": inp,
+                            "output_tokens": out,
+                        }))
 
         # Process any remaining buffer
         if buffer.strip():

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-proxy
+  namespace: gmr
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # ReadWriteOnce PVC + OAuth state: don't run two pods at once
+  selector:
+    matchLabels:
+      app: claude-proxy
+  template:
+    metadata:
+      labels:
+        app: claude-proxy
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: claude-home
+          persistentVolumeClaim:
+            claimName: claude-proxy-home
+        - name: claude-creds
+          secret:
+            secretName: claude-credentials
+            items:
+              - key: credentials.json
+                path: credentials.json
+      containers:
+        - name: proxy
+          image: contribute.void42.internal/golden/gmr-mcp-server:{{ .Values.version }}
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: HOME
+              value: /claude-home
+            - name: GMR_API_URL
+              value: http://gmr-api.gmr.svc.cluster.local
+            - name: MCP_SERVER_PATH
+              value: /app/src/index.js
+            - name: CLAUDE_CLI_PATH
+              value: /usr/local/bin/claude
+          volumeMounts:
+            - name: claude-home
+              mountPath: /claude-home
+            - name: claude-creds
+              mountPath: /run/secrets/claude
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
