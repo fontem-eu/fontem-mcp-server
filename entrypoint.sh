@@ -32,18 +32,21 @@ MCP_CONFIG="/tmp/gmr-mcp.json"
 # 1+2: make sure we have a writable ~/.claude with credentials in it
 mkdir -p "${CLAUDE_DIR}"
 
-if [ ! -s "${CLAUDE_CREDS}" ]; then
-    if [ -s "${SECRET_CREDS}" ]; then
-        echo "[entrypoint] No credentials in PVC — seeding from Secret mount"
+# Always re-seed from the Secret if it's newer than what's on the PVC.
+# This ensures that updating the K8s Secret + restarting the pod picks up
+# fresh credentials even when the PVC already has (possibly stale) tokens.
+if [ -s "${SECRET_CREDS}" ]; then
+    if [ ! -s "${CLAUDE_CREDS}" ] || [ "${SECRET_CREDS}" -nt "${CLAUDE_CREDS}" ]; then
+        echo "[entrypoint] Seeding credentials from Secret mount → PVC"
         cp "${SECRET_CREDS}" "${CLAUDE_CREDS}"
         chmod 600 "${CLAUDE_CREDS}"
     else
-        echo "[entrypoint] FATAL: no credentials in PVC and no Secret mounted at ${SECRET_CREDS}" >&2
-        echo "[entrypoint] Mount the claude-credentials Secret or seed the PVC manually." >&2
-        exit 1
+        echo "[entrypoint] Using existing credentials from PVC (token refresh persists here)"
     fi
-else
-    echo "[entrypoint] Using existing credentials from PVC (token refresh persists here)"
+elif [ ! -s "${CLAUDE_CREDS}" ]; then
+    echo "[entrypoint] FATAL: no credentials in PVC and no Secret mounted at ${SECRET_CREDS}" >&2
+    echo "[entrypoint] Mount the claude-credentials Secret or seed the PVC manually." >&2
+    exit 1
 fi
 
 # 3: write the MCP config that the proxy references via --mcp-config

@@ -273,7 +273,41 @@ class ThreadedServer(ThreadingMixIn, HTTPServer):
     pass
 
 
+# ── OAuth keepalive ───────────────────────────────────────────
+#
+# Claude CLI's OAuth token expires after ~7 days of inactivity.
+# This background thread makes a cheap CLI call every 4 hours to
+# trigger token refresh, preventing silent auth expiry.
+
+import threading
+
+KEEPALIVE_INTERVAL = 4 * 3600  # seconds between pings
+
+
+def _keepalive_loop():
+    """Periodically invoke Claude CLI to trigger OAuth token refresh."""
+    while True:
+        time.sleep(KEEPALIVE_INTERVAL)
+        try:
+            proc = asyncio.run(
+                asyncio.create_subprocess_exec(
+                    CLAUDE_CLI, "-p", "ping", "--max-turns", "1",
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+            )
+            asyncio.run(asyncio.wait_for(proc.wait(), timeout=60))
+            print(f"[keepalive] token refreshed (rc={proc.returncode})", flush=True)
+        except Exception as exc:
+            print(f"[keepalive] failed: {exc}", flush=True)
+
+
 if __name__ == "__main__":
+    # Start the keepalive daemon thread
+    t = threading.Thread(target=_keepalive_loop, daemon=True, name="oauth-keepalive")
+    t.start()
+    print(f"[keepalive] started (every {KEEPALIVE_INTERVAL // 3600}h)", flush=True)
+
     port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8090
     srv = ThreadedServer(("0.0.0.0", port), Handler)
     print(f"Claude MCP proxy (streaming) on :{port}", flush=True)
