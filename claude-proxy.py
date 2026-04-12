@@ -80,8 +80,8 @@ DISALLOWED_TOOLS = "Bash,Read,Write,Edit,Glob,Grep,computer,NotebookEdit,WebFetc
 def _build_args_text(message, system):
     """Build args for blocking text output."""
     return [
-        CLAUDE_CLI, "-p", message,
-        "--append-system-prompt", system,
+        CLAUDE_CLI, "--bare", "-p", message,
+        "--system-prompt", system,
         "--mcp-config", MCP_CONFIG,
         "--tools", "",
         "--allowedTools", MCP_TOOLS,
@@ -92,8 +92,8 @@ def _build_args_text(message, system):
 def _build_args_stream(message, system):
     """Build args for streaming JSON output with tool visibility."""
     return [
-        CLAUDE_CLI, "-p", message,
-        "--append-system-prompt", system,
+        CLAUDE_CLI, "--bare", "-p", message,
+        "--system-prompt", system,
         "--mcp-config", MCP_CONFIG,
         "--tools", "",
         "--allowedTools", MCP_TOOLS,
