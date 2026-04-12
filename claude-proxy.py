@@ -278,10 +278,56 @@ class ThreadedServer(ThreadingMixIn, HTTPServer):
 # Claude CLI's OAuth token expires after ~7 days of inactivity.
 # This background thread makes a cheap CLI call every 4 hours to
 # trigger token refresh, preventing silent auth expiry.
+#
+# After each successful refresh, it syncs the updated credentials
+# back to the K8s Secret so that a pod restart (e.g. kube-monkey
+# chaos kill) re-seeds from fresh tokens instead of stale ones.
 
+import base64
 import threading
+import urllib.request
+import ssl
 
 KEEPALIVE_INTERVAL = 4 * 3600  # seconds between pings
+CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
+K8S_SECRET_NAME = "claude-credentials"
+K8S_NAMESPACE = "gmr"
+
+
+def _sync_secret():
+    """Push the current PVC credentials back to the K8s Secret."""
+    try:
+        with open(CREDS_PATH, "r") as f:
+            creds = f.read()
+
+        # In-cluster K8s API auth
+        token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        with open(token_path) as f:
+            sa_token = f.read().strip()
+
+        url = (
+            f"https://kubernetes.default.svc/api/v1"
+            f"/namespaces/{K8S_NAMESPACE}/secrets/{K8S_SECRET_NAME}"
+        )
+        patch = json.dumps({
+            "data": {
+                "credentials.json": base64.b64encode(creds.encode()).decode()
+            }
+        }).encode()
+
+        ctx = ssl.create_default_context(cafile=ca_path)
+        req = urllib.request.Request(
+            url, data=patch, method="PATCH",
+            headers={
+                "Authorization": f"Bearer {sa_token}",
+                "Content-Type": "application/strategic-merge-patch+json",
+            },
+        )
+        urllib.request.urlopen(req, context=ctx, timeout=10)
+        print("[keepalive] synced credentials to K8s Secret", flush=True)
+    except Exception as exc:
+        print(f"[keepalive] secret sync failed: {exc}", flush=True)
 
 
 def _keepalive_loop():
@@ -298,6 +344,8 @@ def _keepalive_loop():
             )
             asyncio.run(asyncio.wait_for(proc.wait(), timeout=60))
             print(f"[keepalive] token refreshed (rc={proc.returncode})", flush=True)
+            if proc.returncode == 0:
+                _sync_secret()
         except Exception as exc:
             print(f"[keepalive] failed: {exc}", flush=True)
 

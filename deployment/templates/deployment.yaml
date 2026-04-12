@@ -20,6 +20,7 @@ spec:
         kube-monkey/kill-mode: fixed
         kube-monkey/kill-value: "1"
     spec:
+      serviceAccountName: claude-proxy
       imagePullSecrets:
         - name: regcred
       volumes:
