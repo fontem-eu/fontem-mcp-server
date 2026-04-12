@@ -47,13 +47,22 @@ TOOL_LABELS = {
 }
 
 
+# Built-in tools that must never be available to the agent.
+# --tools "" disables all built-in tools (Bash, Read, Write, Edit, etc.)
+# leaving only MCP server tools. --disallowedTools is belt-and-suspenders
+# in case a future CLI version changes the --tools semantics.
+DISALLOWED_TOOLS = "Bash,Read,Write,Edit,Glob,Grep,computer,NotebookEdit,WebFetch,WebSearch"
+
+
 def _build_args_text(message, system):
     """Build args for blocking text output."""
     return [
         CLAUDE_CLI, "-p", message,
         "--append-system-prompt", system,
         "--mcp-config", MCP_CONFIG,
+        "--tools", "",
         "--allowedTools", MCP_TOOLS,
+        "--disallowedTools", DISALLOWED_TOOLS,
     ]
 
 
@@ -63,7 +72,9 @@ def _build_args_stream(message, system):
         CLAUDE_CLI, "-p", message,
         "--append-system-prompt", system,
         "--mcp-config", MCP_CONFIG,
+        "--tools", "",
         "--allowedTools", MCP_TOOLS,
+        "--disallowedTools", DISALLOWED_TOOLS,
         "--output-format", "stream-json",
         "--verbose",
     ]
