@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: claude-proxy
-  namespace: gmr
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   strategy:
@@ -44,7 +44,7 @@ spec:
             - name: HOME
               value: /claude-home
             - name: GMR_API_URL
-              value: http://gmr-api.gmr.svc.cluster.local
+              value: {{ .Values.gmrApiUrl | default "http://gmr-api.gmr.svc.cluster.local" }}
             - name: MCP_SERVER_PATH
               value: /app/src/index.js
             - name: CLAUDE_CLI_PATH
