@@ -184,7 +184,7 @@ server.tool(
 server.tool(
   'search_entities',
   'Search for companies, authorities, persons, or lobbyists by name',
-  { query: z.string().describe('Search query'), limit: z.number().default(5).describe('Max results') },
+  { query: z.string().max(500).describe('Search query'), limit: z.number().int().min(1).max(50).default(5).describe('Max results') },
   async ({ query, limit }) => ({
     content: [{ type: 'text', text: await apiCall(`/search?q=${encodeURIComponent(query)}&limit=${limit}`) }],
   }),
@@ -202,7 +202,7 @@ server.tool(
 server.tool(
   'get_contracts',
   'Get procurement contracts for a company or authority',
-  { entity_id: z.string().describe('Company or Authority ID'), limit: z.number().default(20) },
+  { entity_id: z.string().describe('Company or Authority ID'), limit: z.number().int().min(1).max(200).default(20) },
   async ({ entity_id, limit }) => {
     let result = await apiCall(`/companies/${encodeURIComponent(entity_id)}/contracts?limit=${limit}`)
     if (result.includes('"error"') || result.includes('404')) {
@@ -224,7 +224,7 @@ server.tool(
 server.tool(
   'explore_graph',
   'Traverse the entity relationship graph from a starting node. Returns connected nodes and edges.',
-  { entity_id: z.string().describe('Starting entity UUID'), depth: z.number().default(1).describe('Traversal depth 1-3') },
+  { entity_id: z.string().describe('Starting entity UUID'), depth: z.number().int().min(1).max(3).default(1).describe('Traversal depth 1-3') },
   async ({ entity_id, depth }) => ({
     content: [{ type: 'text', text: await apiCall(`/graph/${encodeURIComponent(entity_id)}?depth=${depth}`) }],
   }),
@@ -242,7 +242,7 @@ server.tool(
 server.tool(
   'get_fundamentals',
   'Get financial fundamentals (revenue, margins, ratios) for a listed company',
-  { ticker: z.string().describe('Ticker symbol (e.g., AAPL, ASML.AS)'), years: z.number().default(5) },
+  { ticker: z.string().max(20).describe('Ticker symbol (e.g., AAPL, ASML.AS)'), years: z.number().int().min(1).max(20).default(5) },
   async ({ ticker, years }) => ({
     content: [{ type: 'text', text: await apiCall(`/${encodeURIComponent(ticker)}/fundamentals?years=${years}`) }],
   }),

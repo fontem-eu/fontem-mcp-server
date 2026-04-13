@@ -103,9 +103,27 @@ def _build_args_stream(message, system):
     ]
 
 
+MAX_REQUEST_BYTES = 500_000  # 500 KB — plenty for messages + context
+
+
 class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/health":
+            body = b'{"status":"ok"}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_REQUEST_BYTES:
+            self.send_error(413, f"Payload too large (max {MAX_REQUEST_BYTES} bytes)")
+            return
+
         body = json.loads(self.rfile.read(length)) if length else {}
         message = body.get("message", "")
         system = body.get("system", SYSTEM)

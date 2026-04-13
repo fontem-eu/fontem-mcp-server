@@ -56,15 +56,19 @@ spec:
               mountPath: /run/secrets/claude
               readOnly: true
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 3
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health
               port: http
             initialDelaySeconds: 30
             periodSeconds: 30
+            timeoutSeconds: 3
           resources:
             requests:
               memory: "256Mi"
