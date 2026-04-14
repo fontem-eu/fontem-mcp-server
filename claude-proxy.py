@@ -257,12 +257,18 @@ class Handler(BaseHTTPRequestHandler):
                             if query:
                                 detail += f': "{query}"'
 
-                            self._send_sse("status", json.dumps({
+                            event_data = {
                                 "phase": "tool_use",
                                 "tool": tool_name,
                                 "detail": detail,
                                 "elapsed": elapsed,
-                            }))
+                            }
+                            # Forward propose_edit params so the frontend
+                            # can render the proposal accept/reject UI.
+                            if tool_name == "mcp__gmr__propose_edit":
+                                event_data["proposal"] = tool_input
+
+                            self._send_sse("status", json.dumps(event_data))
 
                         elif btype == "text":
                             text = block.get("text", "")
