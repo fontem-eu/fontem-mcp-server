@@ -8,10 +8,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Install git
-        run: apt-get update && apt-get install -y git || apk add --no-cache git || true
       - uses: actions/checkout@v4
+      - run: ls -la && cat package.json | head -5
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Run tests
         run: node --test tests/
