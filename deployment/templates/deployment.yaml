@@ -44,7 +44,7 @@ spec:
             - name: HOME
               value: /claude-home
             - name: GMR_API_URL
-              value: {{ .Values.gmrApiUrl | default "http://gmr-api.gmr.svc.cluster.local" }}
+              value: {{ .Values.gmrApiUrl }}
             - name: MCP_SERVER_PATH
               value: /app/src/index.js
             - name: CLAUDE_CLI_PATH
