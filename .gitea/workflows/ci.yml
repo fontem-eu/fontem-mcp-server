@@ -14,6 +14,26 @@ jobs:
       - name: Run tests
         run: node --test tests/ || echo "Tests exited with $?"
 
+  analyze:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: SonarQube scan
+        run: npx sonarqube-scanner -Dsonar.host.url=http://sonarqube.sonarqube.svc.cluster.local:9000 -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+      - name: Generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
+      - name: Upload SBOM to Dependency-Track
+        run: |
+          curl -fsS -X POST "http://dependency-track.dependency-track.svc.cluster.local:8080/api/v1/bom" \
+            -H "X-Api-Key: ${{ secrets.DTRACK_API_KEY }}" \
+            -H "Content-Type: multipart/form-data" \
+            -F "projectName=gmr-mcp-server" -F "projectVersion=$(git rev-parse --short HEAD)" \
+            -F "autoCreate=true" -F "bom=@sbom.json"
+
   build-deploy:
     needs: test
     if: github.ref == 'refs/heads/main'
