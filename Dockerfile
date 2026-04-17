@@ -12,12 +12,17 @@
 
 FROM node:22-slim
 
+COPY void42-ca.crt /usr/local/share/ca-certificates/void42-ca.crt
+
 # System deps: Python for the proxy, git for CLI MCP resolution, ca-certs
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         ca-certificates \
         git \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+RUN npm config set registry https://nexus.void42.internal/repository/npm-proxy/ --global
 
 # Install the Claude Code CLI globally (provides /usr/local/bin/claude)
 RUN npm install -g --omit=dev @anthropic-ai/claude-code@2.1.101 \
@@ -26,7 +31,7 @@ RUN npm install -g --omit=dev @anthropic-ai/claude-code@2.1.101 \
 WORKDIR /app
 
 # MCP server deps — installed first for layer cacheability
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Application source
