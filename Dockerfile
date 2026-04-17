@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/void42-ca.crt
+
 RUN npm config set registry https://nexus.void42.internal/repository/npm-proxy/ --global
 
 # Install the Claude Code CLI globally (provides /usr/local/bin/claude)
