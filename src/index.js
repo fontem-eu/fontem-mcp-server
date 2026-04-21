@@ -266,6 +266,71 @@ server.tool(
   }),
 )
 
+// ── Consolidator tools ──────────────────────────────────────────
+
+const CONSOLIDATOR = process.env.CONSOLIDATOR_URL || 'http://gmr-consolidator.gmr.svc.cluster.local:8000'
+
+async function consolidatorCall(method, path, body) {
+  try {
+    const res = await fetch(`${CONSOLIDATOR}${path}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    if (!res.ok) return JSON.stringify({ error: `consolidator ${res.status}: ${res.statusText}` })
+    return await res.text()
+  } catch (e) {
+    return JSON.stringify({ error: `consolidator unreachable: ${e.message}` })
+  }
+}
+
+server.tool(
+  'consolidate_entity',
+  'Run the consolidation rule pipeline against a Company or Authority. Returns the rules that fired, decisions made, and any merge target. Idempotent — safe to call repeatedly.',
+  {
+    entity_type: z.enum(['Company', 'Authority']).describe('Entity label'),
+    entity_id: z.string().describe('gmr_id (Company) or authority_id (Authority)'),
+  },
+  async ({ entity_type, entity_id }) => {
+    const path = entity_type === 'Company'
+      ? `/consolidate/company/${encodeURIComponent(entity_id)}`
+      : `/consolidate/authority/${encodeURIComponent(entity_id)}`
+    return { content: [{ type: 'text', text: await consolidatorCall('POST', path) }] }
+  },
+)
+
+server.tool(
+  'list_pending_candidates',
+  'List :SAME_AS candidates flagged by the consolidator awaiting human review. Each result shows the rule that produced it, confidence, and the two entities being compared.',
+  {
+    entity_type: z.enum(['Company', 'Authority']).optional().describe('Filter by entity type'),
+    limit: z.number().int().min(1).max(200).default(50).describe('Max results'),
+  },
+  async ({ entity_type, limit }) => {
+    const params = new URLSearchParams({ reviewed: 'false', limit: String(limit) })
+    if (entity_type) params.set('entity_type', entity_type)
+    return { content: [{ type: 'text', text: await consolidatorCall('GET', `/candidates?${params}`) }] }
+  },
+)
+
+server.tool(
+  'consolidator_decisions',
+  'Browse the consolidator decision audit log. Useful for debugging why two entities were/were not merged.',
+  {
+    entity_type: z.enum(['Company', 'Authority']).optional(),
+    entity_id: z.string().optional().describe('Filter to one entity'),
+    rule_name: z.string().optional().describe('Filter to one rule, e.g. "exact_lei_match"'),
+    limit: z.number().int().min(1).max(200).default(50),
+  },
+  async ({ entity_type, entity_id, rule_name, limit }) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (entity_type) params.set('entity_type', entity_type)
+    if (entity_id) params.set('entity_id', entity_id)
+    if (rule_name) params.set('rule_name', rule_name)
+    return { content: [{ type: 'text', text: await consolidatorCall('GET', `/decisions?${params}`) }] }
+  },
+)
+
 // ── Prompts ──────────────────────────────────────────────────────
 
 server.prompt(
