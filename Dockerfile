@@ -10,7 +10,7 @@
 # writable PVC-backed location on first boot, then execs the proxy. Subsequent
 # token refreshes persist in the PVC and survive pod restarts.
 
-FROM node:22-slim
+FROM node:24-slim
 
 COPY void42-ca.crt /usr/local/share/ca-certificates/void42-ca.crt
 
