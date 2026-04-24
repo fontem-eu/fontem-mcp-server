@@ -35,19 +35,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: golden/gmr-ci
+          path: .gmr-ci
+          token: ${{ secrets.GMR_CI_READ_TOKEN }}
       - name: Install dependencies
         run: npm install --ignore-scripts
-      - name: SonarQube scan (blocking on quality gate)
-        # qualitygate.wait=true keeps the scanner running until Sonar
-        # publishes the gate verdict for this analysis, then exits
-        # non-zero on ERROR. Without it the scanner returns the moment
-        # the report upload finishes and CI goes green even when the
-        # gate is red.
-        run: |
-          npx sonarqube-scanner \
-            -Dsonar.host.url=http://sonarqube.sonarqube.svc.cluster.local:9000 \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.qualitygate.wait=true
+      - uses: ./.gmr-ci/actions/sonar-scan
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
 
   # Build → sign → attest SBOM → deploy. SBOM generation moved into
   # this job so the same file is both uploaded to DT and used as the
@@ -63,12 +60,6 @@ jobs:
           repository: golden/gmr-ci
           path: .gmr-ci
           token: ${{ secrets.GMR_CI_READ_TOKEN }}
-
-      - name: Setup Docker + Cosign
-        run: |
-          curl -fsSL https://nexus.void42.internal/repository/docker-releases/linux/static/stable/x86_64/docker-27.5.1.tgz | tar xz --strip-components=1 -C /usr/local/bin docker/docker
-          curl -sL https://nexus.void42.internal/repository/github-releases/sigstore/cosign/releases/download/v2.4.1/cosign-linux-amd64 -o /usr/local/bin/cosign
-          chmod +x /usr/local/bin/cosign
 
       - name: Install deps (for cyclonedx-npm)
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -92,17 +83,11 @@ jobs:
           registry-password: ${{ secrets.REGISTRY_PASSWORD }}
           sbom-path: ${{ steps.sbom.outputs.sbom-path }}
 
-      - name: Deploy to dev
-        env:
-          TAG: ${{ steps.image.outputs.tag }}
-        run: |
-          git clone --depth=1 https://oauth2:${{ secrets.REGISTRY_PASSWORD }}@contribute.void42.internal/golden/gitops.git /tmp/gitops
-          cd /tmp/gitops
-          sed -i "s/version: \".*\"/version: \"$TAG\"/" dev/claude-proxy.yaml
-          git config user.name "GMR CI"
-          git config user.email "ci@void42.internal"
-          git add dev/claude-proxy.yaml
-          git diff --cached --quiet || git commit -m "ci: deploy claude-proxy $TAG to dev"
-          git push origin main
+      - uses: ./.gmr-ci/actions/gitops-bump
+        with:
+          service: claude-proxy
+          tag: ${{ steps.image.outputs.tag }}
+          env: dev
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
 # retrigger 1776440393
