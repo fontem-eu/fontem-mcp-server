@@ -138,6 +138,13 @@ All contract values are in EUR. Financial data for US companies is in USD.
 ## Report Widgets
 Reports can embed interactive visualizations. See the widget catalog resource for syntax.
 When you think a visualization would help the user, write the widget block directly in your response.
+
+## Atlas — European Statistics Catalogue
+Beyond the procurement graph, the platform exposes a curated catalogue of Eurostat
+datasets (population, GDP, unemployment, R&D, migration, crime, etc.) keyed by
+NUTS region. Use \`atlas_list_datasets\` to browse available codes and
+\`atlas_get_series\` to fetch a slice. The \`atlas_map\` widget renders a
+choropleth snapshot inline in a report.
 `,
     }],
   }),
@@ -255,6 +262,40 @@ server.tool(
   async ({ config }) => ({
     content: [{ type: 'text', text: JSON.stringify(validateWidget(config)) }],
   }),
+)
+
+server.tool(
+  'atlas_list_datasets',
+  'List the Eurostat datasets available in the Atlas catalogue. Returns code, label, theme, supported NUTS levels, last sync, and per-dimension code→label maps. Use these codes with atlas_get_series and atlas_map widgets.',
+  {},
+  async () => ({
+    content: [{ type: 'text', text: await apiCall('/atlas/datasets') }],
+  }),
+)
+
+server.tool(
+  'atlas_get_series',
+  'Fetch time-series rows for one Atlas dataset. Use to confirm which years/dimensions exist before embedding an atlas_map widget. Supply EITHER `geo` (one or more NUTS codes) OR `nuts_level` (0..3 for every region at that level).',
+  {
+    dataset: z.string().describe('Atlas dataset code, e.g. "nama_10r_2gdp"'),
+    geo: z.array(z.string()).optional().describe('NUTS codes, e.g. ["DE","FR"]'),
+    nuts_level: z.number().int().min(0).max(3).optional().describe('NUTS level 0..3'),
+    start: z.number().int().optional().describe('Start year'),
+    end: z.number().int().optional().describe('End year'),
+    dimensions: z.object({}).passthrough().optional().describe('Dim code filter, e.g. {"unit":"MIO_EUR"}'),
+  },
+  async ({ dataset, geo, nuts_level, start, end, dimensions }) => {
+    const q = new URLSearchParams()
+    q.set('dataset', dataset)
+    if (Array.isArray(geo)) for (const g of geo) q.append('geo', g)
+    if (nuts_level !== undefined) q.set('nuts_level', String(nuts_level))
+    if (start !== undefined) q.set('start', String(start))
+    if (end !== undefined) q.set('end', String(end))
+    if (dimensions && Object.keys(dimensions).length > 0) {
+      q.set('dimensions', JSON.stringify(dimensions))
+    }
+    return { content: [{ type: 'text', text: await apiCall(`/atlas/series?${q.toString()}`) }] }
+  },
 )
 
 server.tool(

@@ -60,8 +60,11 @@ describe('validateWidget', () => {
 })
 
 describe('WIDGET_TYPES', () => {
-  it('has three widget types', () => {
-    assert.strictEqual(Object.keys(WIDGET_TYPES).length, 3)
+  it('has the expected widget types', () => {
+    assert.deepStrictEqual(
+      Object.keys(WIDGET_TYPES).sort(),
+      ['atlas_map', 'contracts_table', 'entity_profile', 'graph_explorer'],
+    )
   })
 
   it('each type has required fields', () => {

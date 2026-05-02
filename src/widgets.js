@@ -47,6 +47,20 @@ export const WIDGET_TYPES = {
     required: ['widget_type', 'entityId'],
     example: '```widget\n{"widget_type": "entity_profile", "schema_version": 1, "entityId": "AAPL"}\n```',
   },
+  atlas_map: {
+    label: 'Atlas Map',
+    description: 'Choropleth snapshot from the Atlas catalogue (curated Eurostat datasets — population, GDP, unemployment, R&D, migration, crime, etc.). Fixed (dataset, NUTS level, year, dimension slice). Use atlas_list_datasets to find a dataset code, then atlas_get_series to confirm the (year, dimensions) you want before embedding.',
+    schema: {
+      widget_type: { type: 'string', const: 'atlas_map' },
+      schema_version: { type: 'number', const: 1 },
+      dataset: { type: 'string', description: 'Atlas dataset code, e.g. "nama_10r_2gdp" (GDP × NUTS-2). Use atlas_list_datasets to discover.' },
+      nuts_level: { type: 'number', description: 'NUTS aggregation level: 0 country, 1 macro-region, 2 region, 3 sub-region. Must be in the dataset\'s nuts_levels.' },
+      year: { type: 'number', description: 'Year to colour. Omit to default to the latest available.' },
+      dimensions: { type: 'object', description: 'Code-to-code dim filter, e.g. {"unit":"MIO_EUR"} or {"iccs":"ICCS0101","unit":"NR"}. Omit to default to the largest slice. Use atlas_get_series to see the codes that exist for the dataset.' },
+    },
+    required: ['widget_type', 'dataset', 'nuts_level'],
+    example: '```widget\n{"widget_type": "atlas_map", "schema_version": 1, "dataset": "crim_off_cat", "nuts_level": 0, "year": 2024, "dimensions": {"iccs": "ICCS0101", "unit": "P_HTHAB"}}\n```',
+  },
 }
 
 /**
