@@ -1,9 +1,9 @@
 /**
  * Widget catalog — describes the embeddable visualizations available
- * in the GMR report editor. The LLM reads this as a resource and writes
- * widget blocks directly in its responses.
+ * in the Fontem data-story editor. The LLM reads this as a resource and
+ * writes widget blocks directly in its responses.
  *
- * Syntax in reports:
+ * Syntax in data stories:
  *   ```widget
  *   {"widget_type": "graph_explorer", "entityId": "...", ...}
  *   ```
@@ -99,8 +99,8 @@ export function validateWidget(config) {
  * Generate the full widget catalog as a markdown document for the LLM resource.
  */
 export function widgetCatalogMarkdown() {
-  let md = '# GMR Widget Catalog\n\n'
-  md += 'Embed interactive visualizations in reports using this syntax:\n\n'
+  let md = '# Fontem Widget Catalog\n\n'
+  md += 'Embed interactive visualizations in data stories using this syntax:\n\n'
   md += '````\n```widget\n{"widget_type": "...", "schema_version": 1, ...}\n```\n````\n\n'
 
   for (const [key, spec] of Object.entries(WIDGET_TYPES)) {

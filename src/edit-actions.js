@@ -1,5 +1,5 @@
 /**
- * Report edit action schemas — SINGLE SOURCE OF TRUTH.
+ * Data-story edit action schemas — SINGLE SOURCE OF TRUTH.
  *
  * Used by:
  *   1. MCP server → tells Claude what edits are possible (propose_edit tool)
@@ -13,7 +13,7 @@
 
 export const EDIT_ACTIONS = {
   add_section: {
-    description: 'Add a new section to the report with the given HTML content.',
+    description: 'Add a new section to the data story with the given HTML content.',
     params: {
       content: { type: 'string', required: true, description: 'HTML content for the new section' },
     },
@@ -30,15 +30,15 @@ export const EDIT_ACTIONS = {
   },
 
   update_title: {
-    description: 'Change the report title.',
+    description: 'Change the data story title.',
     params: {
-      title: { type: 'string', required: true, description: 'New report title' },
+      title: { type: 'string', required: true, description: 'New title' },
     },
     example: { action: 'update_title', title: 'VINCI Procurement Analysis 2024' },
   },
 
   update_abstract: {
-    description: 'Change the report abstract/summary.',
+    description: 'Change the data story abstract/summary.',
     params: {
       abstract: { type: 'string', required: true, description: 'New abstract text' },
     },
@@ -101,8 +101,8 @@ export function validateEditAction(proposal) {
  * Generate markdown documentation of all edit actions for the LLM resource.
  */
 export function editActionsCatalogMarkdown() {
-  let md = '# Report Edit Actions\n\n'
-  md += 'Use the `propose_edit` tool to suggest changes to the current report.\n'
+  let md = '# Data-story Edit Actions\n\n'
+  md += 'Use the `propose_edit` tool to suggest changes to the current data story.\n'
   md += 'Each proposal must include an `action` field and the required parameters.\n\n'
 
   for (const [key, spec] of Object.entries(EDIT_ACTIONS)) {

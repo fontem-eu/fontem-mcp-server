@@ -135,8 +135,8 @@ through procurement contracts, corporate structures, and lobbying declarations.
 ## Currency
 All contract values are in EUR. Financial data for US companies is in USD.
 
-## Report Widgets
-Reports can embed interactive visualizations. See the widget catalog resource for syntax.
+## Data-story Widgets
+Data stories can embed interactive visualizations. See the widget catalog resource for syntax.
 When you think a visualization would help the user, write the widget block directly in your response.
 
 ## Atlas — European Statistics Catalogue
@@ -144,7 +144,7 @@ Beyond the procurement graph, the platform exposes a curated catalogue of Eurost
 datasets (population, GDP, unemployment, R&D, migration, crime, etc.) keyed by
 NUTS region. Use \`atlas_list_datasets\` to browse available codes and
 \`atlas_get_series\` to fetch a slice. The \`atlas_map\` widget renders a
-choropleth snapshot inline in a report.
+choropleth snapshot inline in a data story.
 `,
     }],
   }),
@@ -166,7 +166,7 @@ server.resource(
 
 server.tool(
   'propose_edit',
-  'Propose an edit to the current report. The user will review and approve before it is applied. Read the edit-actions resource first to see available actions.',
+  'Propose an edit to the current data story. The user will review and approve before it is applied. Read the edit-actions resource first to see available actions.',
   { action: z.string().describe('Edit action name'), params: z.object({}).passthrough().describe('Action parameters') },
   async ({ action, params }) => {
     const proposal = { action, ...params }
@@ -257,7 +257,7 @@ server.tool(
 
 server.tool(
   'validate_widget',
-  'Validate a widget JSON config before embedding in a report. Returns {valid: true} or {valid: false, errors: [...]}',
+  'Validate a widget JSON config before embedding in a data story. Returns {valid: true} or {valid: false, errors: [...]}',
   { config: z.object({}).passthrough().describe('The widget JSON config to validate') },
   async ({ config }) => ({
     content: [{ type: 'text', text: JSON.stringify(validateWidget(config)) }],
@@ -390,7 +390,7 @@ server.prompt(
 3. Explore its network (graph traversal)
 4. Search the web for recent news or context
 5. Summarize your findings with specific numbers and citations
-6. Suggest relevant visualizations to embed in a report (use the widget syntax from the widget catalog)
+6. Suggest relevant visualizations to embed in a data story (use the widget syntax from the widget catalog)
 
 Be thorough but concise. Use bullet points. Cite specific entity IDs so the reader can verify.`,
       },
