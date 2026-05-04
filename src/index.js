@@ -139,6 +139,15 @@ All contract values are in EUR. Financial data for US companies is in USD.
 Data stories can embed interactive visualizations. See the widget catalog resource for syntax.
 When you think a visualization would help the user, write the widget block directly in your response.
 
+## Entity mentions (Fontem IRIs)
+Beyond widgets, the editor supports inline @-mentions of graph entities. Each mention is stored as a Fontem IRI:
+
+  http://data.fontem.eu/id/<Class>/<uuid>
+
+where <Class> is one of Company, Authority, Person, Lobbyist, NUTSRegion, CohesionProject, SanctionedEntity and <uuid> is the existing gmr_id (UUID5). When prose names a graph entity, prefer **propose_edit with action=insert_entity_mention** (see edit-actions resource) over plain text — readers get a clickable chip that opens a side panel with the entity's facts. Today only Company chips reliably resolve; other classes will land as the Virtuoso migration normalises ids.
+
+The search_entities tool already includes a constructed \`iri\` on each Company hit; copy it through to the mention.
+
 ## Atlas — European Statistics Catalogue
 Beyond the procurement graph, the platform exposes a curated catalogue of Eurostat
 datasets (population, GDP, unemployment, R&D, migration, crime, etc.) keyed by
@@ -190,11 +199,27 @@ server.tool(
 
 server.tool(
   'search_entities',
-  'Search for companies, authorities, persons, or lobbyists by name',
+  'Search for companies, authorities, persons, or lobbyists by name. Each Company hit is enriched with a Fontem `iri` field (http://data.fontem.eu/id/Company/<uuid>) — copy it into propose_edit action=insert_entity_mention to create an inline chip.',
   { query: z.string().max(500).describe('Search query'), limit: z.number().int().min(1).max(50).default(5).describe('Max results') },
-  async ({ query, limit }) => ({
-    content: [{ type: 'text', text: await apiCall(`/search?q=${encodeURIComponent(query)}&limit=${limit}`) }],
-  }),
+  async ({ query, limit }) => {
+    const raw = await apiCall(`/search?q=${encodeURIComponent(query)}&limit=${limit}`)
+    let payload
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      // Upstream emitted a non-JSON error envelope; pass it through
+      // unchanged so the assistant sees the same surface.
+      return { content: [{ type: 'text', text: raw }] }
+    }
+    if (Array.isArray(payload?.companies)) {
+      for (const c of payload.companies) {
+        if (c?.gmr_id) {
+          c.iri = `http://data.fontem.eu/id/Company/${c.gmr_id}`
+        }
+      }
+    }
+    return { content: [{ type: 'text', text: JSON.stringify(payload) }] }
+  },
 )
 
 server.tool(

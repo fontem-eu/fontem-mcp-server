@@ -62,8 +62,23 @@ describe('validateEditAction', () => {
 })
 
 describe('EDIT_ACTIONS', () => {
-  it('has five action types', () => {
-    assert.strictEqual(Object.keys(EDIT_ACTIONS).length, 5)
+  it('has six action types', () => {
+    assert.strictEqual(Object.keys(EDIT_ACTIONS).length, 6)
+  })
+
+  it('insert_entity_mention requires iri + label', () => {
+    const ok = validateEditAction({
+      action: 'insert_entity_mention',
+      iri: 'http://data.fontem.eu/id/Company/ef69a162-e55c-5d6b-a497-f6436c4e050c',
+      label: 'Siemens AG',
+    })
+    assert.strictEqual(ok.valid, true)
+
+    const noLabel = validateEditAction({
+      action: 'insert_entity_mention',
+      iri: 'http://data.fontem.eu/id/Company/ef69a162-e55c-5d6b-a497-f6436c4e050c',
+    })
+    assert.strictEqual(noLabel.valid, false)
   })
 
   it('each action has description, params, example', () => {

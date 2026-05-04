@@ -55,6 +55,20 @@ export const EDIT_ACTIONS = {
     },
     example: { action: 'insert_widget', section_index: -1, widget_type: 'graph_explorer', entityId: 'abc-123', depth: 2 },
   },
+
+  insert_entity_mention: {
+    description:
+      'Insert an inline entity mention chip at the current cursor (or end of body). Renders as a clickable pill that opens a side panel with the entity\'s facts. Use this whenever the prose names a Company / Authority / Person / Lobbyist / NUTSRegion / CohesionProject / SanctionedEntity that\'s in the graph — chips are how a data story stays linked to its sources. Construct `iri` as `http://data.fontem.eu/id/<Class>/<gmr_id>` from the search_entities results.',
+    params: {
+      iri: { type: 'string', required: true, description: 'Full Fontem IRI: http://data.fontem.eu/id/<Class>/<uuid>' },
+      label: { type: 'string', required: true, description: 'Display label for the chip (e.g. "Siemens AG")' },
+    },
+    example: {
+      action: 'insert_entity_mention',
+      iri: 'http://data.fontem.eu/id/Company/ef69a162-e55c-5d6b-a497-f6436c4e050c',
+      label: 'Siemens AG',
+    },
+  },
 }
 
 /**
