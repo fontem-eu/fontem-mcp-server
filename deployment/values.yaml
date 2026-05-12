@@ -1,2 +1,8 @@
 version: "latest"
 gmrApiUrl: "http://gmr-api"
+
+# Per-env overlays (prod/claude-proxy.yaml etc.) supply nodeSelector +
+# tolerations to pin to a specific node-pool. Default empty so non-prod
+# envs schedule freely.
+nodeSelector: {}
+tolerations: []
