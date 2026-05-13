@@ -1,4 +1,4 @@
-# gmr-mcp-server — bundles the Claude proxy and the MCP server into one image.
+# fontem-mcp-server — bundles the Claude proxy and the MCP server into one image.
 #
 # Runtime:
 #   * /app/claude-proxy.py  Python HTTP server on :8090

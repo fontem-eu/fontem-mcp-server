@@ -43,7 +43,7 @@ spec:
                 path: credentials.json
       containers:
         - name: proxy
-          image: contribute.void42.internal/fontem/gmr-mcp-server:{{ .Values.version }}
+          image: contribute.void42.internal/fontem/fontem-mcp-server:{{ .Values.version }}
           imagePullPolicy: Always
           ports:
             - name: http

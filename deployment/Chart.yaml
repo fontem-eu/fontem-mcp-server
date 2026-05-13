@@ -1,4 +1,4 @@
 apiVersion: v1
-name: gmr-mcp-server
+name: fontem-mcp-server
 version: 1.0.0
 description: Claude proxy + GMR MCP server (tools for the research assistant)

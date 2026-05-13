@@ -1,5 +1,5 @@
 #!/bin/sh
-# Entrypoint for the gmr-mcp-server container.
+# Entrypoint for the fontem-mcp-server container.
 #
 # Responsibilities (in order):
 #   1. Ensure $HOME/.claude exists and is writable (PVC mount).

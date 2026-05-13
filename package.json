@@ -1,5 +1,5 @@
 {
-  "name": "gmr-mcp-server",
+  "name": "fontem-mcp-server",
   "version": "1.0.0",
   "description": "MCP server for the GMR EU Knowledge Graph — gives LLMs access to company, procurement, lobbying, and graph data",
   "type": "module",
