@@ -87,7 +87,7 @@ jobs:
         with:
           service: claude-proxy
           tag: ${{ steps.image.outputs.tag }}
-          env: dev
+          env: testing
           registry-password: ${{ secrets.REGISTRY_PASSWORD }}
 
 # retrigger 1776440393
