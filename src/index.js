@@ -13,8 +13,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { widgetCatalogMarkdown, validateWidget } from './widgets.js'
 import { editActionsCatalogMarkdown, validateEditAction, EDIT_ACTIONS } from './edit-actions.js'
+import { sparqlQuery as sparqlProxy } from './sparql.js'
 
 const GMR_API = process.env.GMR_API_URL || 'http://gmr-api.gmr.svc.cluster.local'
+const VIRTUOSO_SPARQL = process.env.VIRTUOSO_SPARQL_URL
+  || 'http://virtuoso.fontem-prod.svc.cluster.local:8890/sparql'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -154,6 +157,143 @@ datasets (population, GDP, unemployment, R&D, migration, crime, etc.) keyed by
 NUTS region. Use \`atlas_list_datasets\` to browse available codes and
 \`atlas_get_series\` to fetch a slice. The \`atlas_map\` widget renders a
 choropleth snapshot inline in a data story.
+
+## SPARQL — federated knowledge bases (read-only)
+The platform runs a Virtuoso triple store that mirrors several public
+knowledge graphs locally. Use the \`sparql_query\` tool for cross-source
+facts that the graph API doesn't expose directly. Available named graphs:
+
+- \`http://data.fontem.eu/graph/sanctions\` — current EU consolidated sanctions
+- \`http://data.fontem.eu/graph/financials/edgar\` — SEC EDGAR filings (US)
+- \`http://data.fontem.eu/graph/financials/esef\` — ESEF filings (EU listed)
+- \`http://data.fontem.eu/graph/wikidata/truthy\` — Wikidata best-value statements (cross-IDs, multilingual labels, geographic + political metadata)
+- \`http://data.fontem.eu/graph/eu/eurovoc\` — EuroVoc multilingual subject thesaurus
+- \`http://data.fontem.eu/graph/eu/cellar\` — EU legal acts + dossiers from the EU Publications Office (regulations, directives, decisions)
+- \`http://data.fontem.eu/graph/eu/cordis\` — EU Horizon / H2020 / FP7 research projects
+
+Read the \`sparql-datasets\` resource for sample queries and prefix
+suggestions. **Prefer SPARQL over web search** when a question can be
+answered from the local copies — it's faster, doesn't egress, and
+gives the user a citable IRI.
+`,
+    }],
+  }),
+)
+
+server.resource(
+  'sparql-datasets',
+  'gmr://sparql/datasets',
+  async () => ({
+    contents: [{
+      uri: 'gmr://sparql/datasets',
+      mimeType: 'text/markdown',
+      text: `# SPARQL datasets — read-only via \`sparql_query\`
+
+The Virtuoso triple store at the platform's prod endpoint hosts both
+**our own data** (sanctions, financial filings, Authority/Company IRIs)
+and **mirrored encyclopedic knowledge** (Wikidata, EuroVoc, CELLAR,
+CORDIS) so the AI helper can answer most factual questions without
+leaving the platform's network.
+
+All graphs share the SPARQL endpoint. Cross-graph joins are first-class
+— that's the entire point of having them in one store. Standard prefix
+conventions:
+
+\`\`\`sparql
+PREFIX wd:      <http://www.wikidata.org/entity/>
+PREFIX wdt:     <http://www.wikidata.org/prop/direct/>
+PREFIX cellar:  <http://publications.europa.eu/resource/cellar/>
+PREFIX eurovoc: <http://eurovoc.europa.eu/>
+PREFIX cordis:  <http://cordis.europa.eu/data/>
+PREFIX fontem:  <http://data.fontem.eu/id/>
+PREFIX fgraph:  <http://data.fontem.eu/graph/>
+PREFIX skos:    <http://www.w3.org/2004/02/skos/core#>
+PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
+\`\`\`
+
+## Graphs
+
+### \`fgraph:wikidata/truthy\` — Wikidata best-value statements
+- Cross-IDs against our \`Company\` graph via \`wdt:P1278\` (LEI),
+  \`wdt:P5531\` (CIK), \`wdt:P5285\` (UK Companies House), \`wdt:P3220\`
+  (KvK NL), \`wdt:P3375\` (BCE BE), \`wdt:P1297\` (US Federal Employer ID)
+- Geographic hierarchy: \`wdt:P17\` (country), \`wdt:P131\` (located in
+  administrative entity), \`wdt:P625\` (coordinates)
+- Multilingual labels via \`rdfs:label\`
+- License: CC0 1.0
+
+Example — find Apple Inc by LEI, get its country + alternate names:
+
+\`\`\`sparql
+SELECT ?qid ?name ?country WHERE {
+  GRAPH fgraph:wikidata/truthy {
+    ?qid wdt:P1278 "HWUPKR0MPOU8FGXBT394" ;
+         rdfs:label ?name ;
+         wdt:P17 ?countryQid .
+    FILTER(lang(?name) = "en")
+    ?countryQid rdfs:label ?country .
+    FILTER(lang(?country) = "en")
+  }
+} LIMIT 1
+\`\`\`
+
+### \`fgraph:eu/eurovoc\` — EuroVoc thesaurus
+- SKOS concept hierarchy of EU subject vocabulary
+- Multilingual \`skos:prefLabel\` / \`skos:altLabel\` in 24 EU languages
+- \`skos:broader\` / \`skos:narrower\` for the subject tree
+- License: CC BY 4.0
+
+Example — translate "renewable energy" to French + Italian:
+
+\`\`\`sparql
+SELECT ?fr ?it WHERE {
+  GRAPH fgraph:eu/eurovoc {
+    ?concept skos:prefLabel "renewable energy"@en ;
+             skos:prefLabel ?fr ; skos:prefLabel ?it .
+    FILTER(lang(?fr) = "fr")
+    FILTER(lang(?it) = "it")
+  }
+} LIMIT 1
+\`\`\`
+
+### \`fgraph:eu/cellar\` — EU legal acts + dossiers
+- Every Regulation, Directive, Decision in CELLAR, with CELEX ID,
+  publication date, EuroVoc subjects, repealing/amending relationships
+- Cross-link: \`cellar:.../authority\` ↔ \`fontem:Authority/...\` via
+  \`fgraph:links/cellar\` SAME_AS edges
+- License: CC BY 4.0
+
+Example — find the regulation that enacted a known sanctions package:
+
+\`\`\`sparql
+SELECT ?act ?title ?date WHERE {
+  GRAPH fgraph:eu/cellar {
+    ?act cellar:celex_number "32014R0269" ;
+         cellar:title ?title ;
+         cellar:date_publication ?date .
+    FILTER(lang(?title) = "en")
+  }
+} LIMIT 1
+\`\`\`
+
+### \`fgraph:eu/cordis\` — EU research projects
+- Horizon Europe + H2020 + FP7
+- Project ↔ participating organization ↔ funding amount ↔ programme
+- SAME_AS edges to existing \`fontem:Company/{gmr_id}\` IRIs where the
+  beneficiary resolves to a known company
+- License: CC BY 4.0
+
+### Read-write guarantee
+The MCP \`sparql_query\` tool is **read-only**. Any query containing
+\`INSERT\`, \`DELETE\`, \`CLEAR\`, \`LOAD\`, \`CREATE\`, \`DROP\`,
+\`COPY\`, \`MOVE\`, or \`ADD\` is rejected client-side before the
+request reaches Virtuoso. The Virtuoso role used by the MCP server is
+also \`SPARQL_SELECT\` only — defence in depth.
+
+### Result format
+SPARQL Results JSON by default. The shape is the W3C standard
+\`{head: {vars: [...]}, results: {bindings: [...]}}\` for SELECT, or
+RDF/Turtle for CONSTRUCT/DESCRIBE, or \`{boolean: true|false}\` for ASK.
 `,
     }],
   }),
@@ -325,10 +465,22 @@ server.tool(
 
 server.tool(
   'web_search',
-  'Search the web for supplementary information (news, Wikipedia, public records). Use this to complement graph data with external context.',
+  'Search the web for supplementary information (news, Wikipedia, public records). Use this to complement graph data with external context. PREFER `sparql_query` for facts about entities, places, regulations, or research projects — the platform already mirrors Wikidata + EuroVoc + CELLAR + CORDIS locally and they answer faster and more reliably than a web fetch.',
   { query: z.string().describe('Search query') },
   async ({ query }) => ({
     content: [{ type: 'text', text: await webSearch(query) }],
+  }),
+)
+
+server.tool(
+  'sparql_query',
+  'Run a read-only SPARQL query (SELECT / CONSTRUCT / ASK / DESCRIBE) against the platform\'s Virtuoso triple store. Available named graphs: our own data (sanctions, financials/edgar, financials/esef) plus mirrored encyclopedic knowledge (Wikidata truthy, EuroVoc, CELLAR EU legal acts, CORDIS research projects). Read the `sparql-datasets` resource for the full graph inventory + sample queries. SPARQL UPDATE / INSERT / DELETE / CLEAR / LOAD are blocked. Default response format is SPARQL Results JSON.',
+  {
+    query: z.string().max(8000).describe('SPARQL query (SELECT/CONSTRUCT/ASK/DESCRIBE)'),
+    timeout_ms: z.number().int().min(1000).max(60000).default(30000).describe('Server-side timeout in ms (max 60s)'),
+  },
+  async ({ query, timeout_ms }) => ({
+    content: [{ type: 'text', text: await sparqlProxy(VIRTUOSO_SPARQL, query, { timeout_ms }) }],
   }),
 )
 
