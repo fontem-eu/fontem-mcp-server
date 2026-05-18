@@ -214,74 +214,187 @@ PREFIX rdfs:    <http://www.w3.org/2000/01/rdf-schema#>
 ## Graphs
 
 ### \`fgraph:wikidata/truthy\` — Wikidata best-value statements
-- Cross-IDs against our \`Company\` graph via \`wdt:P1278\` (LEI),
-  \`wdt:P5531\` (CIK), \`wdt:P5285\` (UK Companies House), \`wdt:P3220\`
-  (KvK NL), \`wdt:P3375\` (BCE BE), \`wdt:P1297\` (US Federal Employer ID)
-- Geographic hierarchy: \`wdt:P17\` (country), \`wdt:P131\` (located in
-  administrative entity), \`wdt:P625\` (coordinates)
-- Multilingual labels via \`rdfs:label\`
-- License: CC0 1.0
+Encyclopedic knowledge mirrored locally as N-Triples. The truthy slice
+materializes Wikidata's *best* (truthy) statement per (subject, predicate),
+filtered to the property whitelist we actually use. License: **CC0 1.0**.
 
-Example — find Apple Inc by LEI, get its country + alternate names:
+**Predicates we keep** (anything else is filtered out):
+
+| Predicate IRI | Wikidata id | Meaning |
+|---|---|---|
+| \`wdt:P1278\` | LEI | Legal Entity Identifier (joins Fontem Company.lei) |
+| \`wdt:P5531\` | CIK | SEC EDGAR CIK |
+| \`wdt:P5285\` | UK Companies House | UK company number |
+| \`wdt:P3220\` | KvK NL | Dutch chamber-of-commerce id |
+| \`wdt:P3375\` | BCE BE | Belgian VAT/company id |
+| \`wdt:P1297\` | US EIN | Federal Employer Identification Number |
+| \`wdt:P17\` | country | (object is a wd:Q… country) |
+| \`wdt:P31\` | instance of | (object is a wd:Q… class) |
+| \`wdt:P127\` | owned by | parent company (wd:Q…) |
+| \`wdt:P749\` | parent organization | (wd:Q…) |
+| \`wdt:P159\` | headquarters location | (wd:Q…) |
+| \`wdt:P571\` | inception | xsd:dateTime |
+| \`wdt:P5052\` | subsidiary | (wd:Q…) |
+| \`rdfs:label\` | — | filtered to lang en/de/fr/es/it/pt/nl |
+| \`skos:altLabel\` | — | same lang filter |
+| \`schema:description\` | — | same lang filter |
+
+**Joining onto our procurement graph**: most Companies in Fontem have an
+\`lei\` property; \`wdt:P1278\` is the same identifier. The MCP
+\`search_entities\` tool returns Company hits including their LEI; feed it
+into \`sparql_query\` as in the example below.
+
+Example — Apple by LEI, with EN/DE labels + country + founding date:
 
 \`\`\`sparql
-SELECT ?qid ?name ?country WHERE {
-  GRAPH fgraph:wikidata/truthy {
-    ?qid wdt:P1278 "HWUPKR0MPOU8FGXBT394" ;
-         rdfs:label ?name ;
-         wdt:P17 ?countryQid .
-    FILTER(lang(?name) = "en")
-    ?countryQid rdfs:label ?country .
-    FILTER(lang(?country) = "en")
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+SELECT ?qid ?label ?country_qid ?inception WHERE {
+  GRAPH <http://data.fontem.eu/graph/wikidata/truthy> {
+    ?qid wdt:P1278 "HWUPKR0MPOU8FGXBT394" .
+    ?qid <http://www.w3.org/2000/01/rdf-schema#label> ?label .
+    FILTER(lang(?label) = "en")
+    OPTIONAL { ?qid wdt:P17 ?country_qid }
+    OPTIONAL { ?qid wdt:P571 ?inception }
   }
 } LIMIT 1
 \`\`\`
 
-### \`fgraph:eu/eurovoc\` — EuroVoc thesaurus
-- SKOS concept hierarchy of EU subject vocabulary
-- Multilingual \`skos:prefLabel\` / \`skos:altLabel\` in 24 EU languages
-- \`skos:broader\` / \`skos:narrower\` for the subject tree
-- License: CC BY 4.0
+→ Q312 "Apple Inc.", P17→Q30 (USA), inception 1976-04-01.
 
-Example — translate "renewable energy" to French + Italian:
+### \`fgraph:eu/eurovoc\` — EuroVoc thesaurus (EU Publications Office)
+Pure SKOS hierarchy of EU subject vocabulary, multilingual.
+License: **CC BY 4.0** (Source: EU Publications Office).
 
-\`\`\`sparql
-SELECT ?fr ?it WHERE {
-  GRAPH fgraph:eu/eurovoc {
-    ?concept skos:prefLabel "renewable energy"@en ;
-             skos:prefLabel ?fr ; skos:prefLabel ?it .
-    FILTER(lang(?fr) = "fr")
-    FILTER(lang(?it) = "it")
-  }
-} LIMIT 1
-\`\`\`
+**Predicate inventory** (only common ones; SKOS-AP-EU has many):
+- \`skos:prefLabel\` — single per-language preferred term (en/fr/de/it/es/pt/nl/…)
+- \`skos:altLabel\` — synonyms in each language
+- \`skos:broader\` / \`skos:narrower\` — concept tree
+- \`skos:related\` — non-hierarchical cross-links
+- \`skos:inScheme\` — parent ConceptScheme
+- \`skos:topConceptOf\` — top-of-tree marker
+- \`skos:scopeNote\` — usage guidance
+- \`dct:created\` / \`dct:modified\` — concept versioning metadata
 
-### \`fgraph:eu/cellar\` — EU legal acts + dossiers
-- Every Regulation, Directive, Decision in CELLAR, with CELEX ID,
-  publication date, EuroVoc subjects, repealing/amending relationships
-- Cross-link: \`cellar:.../authority\` ↔ \`fontem:Authority/...\` via
-  \`fgraph:links/cellar\` SAME_AS edges
-- License: CC BY 4.0
+Concept IRIs look like \`http://eurovoc.europa.eu/100142\`.
 
-Example — find the regulation that enacted a known sanctions package:
+Example — find the EuroVoc concept for "public procurement" and walk up:
 
 \`\`\`sparql
-SELECT ?act ?title ?date WHERE {
-  GRAPH fgraph:eu/cellar {
-    ?act cellar:celex_number "32014R0269" ;
-         cellar:title ?title ;
-         cellar:date_publication ?date .
-    FILTER(lang(?title) = "en")
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?concept ?parent_label WHERE {
+  GRAPH <http://data.fontem.eu/graph/eu/eurovoc> {
+    ?concept skos:prefLabel "public procurement"@en ;
+             skos:broader ?parent .
+    ?parent skos:prefLabel ?parent_label .
+    FILTER(lang(?parent_label) = "en")
   }
-} LIMIT 1
+}
 \`\`\`
 
 ### \`fgraph:eu/cordis\` — EU research projects
-- Horizon Europe + H2020 + FP7
-- Project ↔ participating organization ↔ funding amount ↔ programme
-- SAME_AS edges to existing \`fontem:Company/{gmr_id}\` IRIs where the
-  beneficiary resolves to a known company
-- License: CC BY 4.0
+Horizon Europe + H2020 + FP7. **82,370 projects, ~200k organization-role
+records (deduped to ~70k distinct organizations)**. Custom \`cordis:\`
+vocabulary; we generated this RDF ourselves from CORDIS's CSV dump because
+CORDIS retired its native RDF distribution. License: **CC BY 4.0**.
+
+**Prefixes**:
+\`\`\`
+PREFIX c:     <http://data.fontem.eu/ontology/cordis#>
+PREFIX cordis: <http://data.fontem.eu/id/cordis/>
+\`\`\`
+
+**Node types**:
+- \`c:Project\` — IRI \`cordis:project/{project_id}\`
+- \`c:Organization\` — IRI \`cordis:organization/{org_id}\`
+
+**Project predicates** (\`c:\` prefix on each):
+| Predicate | Type | Meaning |
+|---|---|---|
+| \`rdf:type c:Project\` | iri | marker |
+| \`c:framework\` | string | "HORIZON" / "H2020" / "FP7" |
+| \`rdfs:label\` | string | project title |
+| \`c:acronym\` | string | short name |
+| \`c:status\` | string | SIGNED / CLOSED / etc. |
+| \`c:startDate\` | xsd:date | |
+| \`c:endDate\` | xsd:date | |
+| \`c:totalCostEur\` | xsd:decimal | total project budget in EUR |
+| \`c:ecContributionEur\` | xsd:decimal | EU funding portion in EUR |
+| \`c:masterCall\` | string | funding call code |
+| \`c:fundingScheme\` | string | grant type (RIA / IA / CSA / etc.) |
+| \`c:objective\` | string | abstract / scientific objective |
+| \`c:hasParticipant\` | iri → c:Organization | |
+
+**Organization predicates**:
+| Predicate | Type | Meaning |
+|---|---|---|
+| \`rdf:type c:Organization\` | iri | marker |
+| \`rdfs:label\` | string | legal name |
+| \`c:country\` | string | ISO alpha-2 country code |
+| \`c:vatNumber\` | string | VAT registration |
+| \`c:sme\` | string | "true" / "false" |
+| \`c:activityType\` | string | HES / REC / PRC / PUB / OTH |
+| \`c:nutsCode\` | string | NUTS-3 region code |
+| \`c:roleIn\` | iri → c:Project | reverse of hasParticipant |
+| \`c:role\` | string | coordinator / participant / partner |
+
+Example — top-funded Horizon Europe projects + their coordinator:
+
+\`\`\`sparql
+PREFIX c: <http://data.fontem.eu/ontology/cordis#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?title ?total_eur ?coord_label WHERE {
+  GRAPH <http://data.fontem.eu/graph/eu/cordis> {
+    ?p a c:Project ;
+       c:framework "HORIZON" ;
+       rdfs:label ?title ;
+       c:totalCostEur ?total_eur ;
+       c:hasParticipant ?coord .
+    ?coord c:role "coordinator" ;
+           rdfs:label ?coord_label .
+  }
+} ORDER BY DESC(xsd:decimal(?total_eur)) LIMIT 5
+\`\`\`
+
+### Cross-graph join idioms
+The point of having everything in one Virtuoso instance is that named-graph
+boundaries don't tax queries. A few patterns to internalize:
+
+**Wikidata QID for a Fontem Company by LEI**:
+\`\`\`sparql
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+SELECT ?company_iri ?qid WHERE {
+  # Take the Fontem Company IRI from a search_entities result (its LEI is
+  # in the search payload).
+  VALUES (?lei) { ("HWUPKR0MPOU8FGXBT394") }
+  GRAPH <http://data.fontem.eu/graph/wikidata/truthy> {
+    ?qid wdt:P1278 ?lei .
+  }
+}
+\`\`\`
+
+**Tag a CORDIS project with its EuroVoc subject(s)** (when the project's
+\`c:objective\` mentions a EuroVoc term — heuristic, not authoritative):
+\`\`\`sparql
+PREFIX c: <http://data.fontem.eu/ontology/cordis#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?project ?eurovoc_label WHERE {
+  GRAPH <http://data.fontem.eu/graph/eu/cordis> {
+    ?project a c:Project ; c:objective ?obj .
+  }
+  GRAPH <http://data.fontem.eu/graph/eu/eurovoc> {
+    ?concept skos:prefLabel ?eurovoc_label .
+    FILTER(lang(?eurovoc_label) = "en")
+    FILTER(CONTAINS(LCASE(?obj), LCASE(?eurovoc_label)))
+  }
+} LIMIT 10
+\`\`\`
+
+### \`fgraph:eu/cellar\` — EU legal acts + dossiers (NOT YET LOADED)
+Will hold every Regulation, Directive, Decision from CELLAR with CELEX
+ID, publication date, and EuroVoc subjects. Loading is blocked on an EU
+Login setup at \`datadump.publications.europa.eu\` — until then this
+graph is empty, queries against it will return zero rows. License:
+**CC BY 4.0**.
 
 ### Read-write guarantee
 The MCP \`sparql_query\` tool is **read-only**. Any query containing
