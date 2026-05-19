@@ -1,7 +1,7 @@
 {
   "name": "fontem-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server for the GMR EU Knowledge Graph — gives LLMs access to company, procurement, lobbying, and graph data",
+  "description": "MCP server for the GMR EU Knowledge Graph \u2014 gives LLMs access to company, procurement, lobbying, and graph data",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -12,6 +12,11 @@
     "test": "node --test tests/"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "overrides": {
+    "hono": "^4.12.21",
+    "fast-uri": "^3.1.2",
+    "ip-address": "^10.2.0"
   }
 }
