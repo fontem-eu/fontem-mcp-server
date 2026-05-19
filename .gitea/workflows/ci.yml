@@ -9,6 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Pin Node 22 so the runner's bundled node version doesn't
+          # leak into the build. fontem-web hit this when vite 8 needed
+          # >=20.19 for `node:util` styleText — the bundled node was
+          # older and the suite crashed at startup.
+          node-version: '22'
       - name: Install dependencies
         run: npm install --ignore-scripts
       - name: Run tests
