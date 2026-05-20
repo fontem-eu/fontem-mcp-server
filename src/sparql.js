@@ -20,7 +20,7 @@ const SPARQL_WRITE_KEYWORDS = [
   'COPY', 'MOVE', 'ADD',
 ]
 const SPARQL_WRITE_RE = new RegExp(
-  '(^|[\\s;])(' + SPARQL_WRITE_KEYWORDS.join('|') + ')([\\s{(<])',
+  String.raw`(^|[\s;])(` + SPARQL_WRITE_KEYWORDS.join('|') + String.raw`)([\s{(<])`,
   'i',
 )
 
