@@ -45,7 +45,7 @@ RUN chmod +x ./entrypoint.sh
 ENV HOME=/claude-home \
     CLAUDE_CLI_PATH=/usr/local/bin/claude \
     MCP_SERVER_PATH=/app/src/index.js \
-    GMR_API_URL=http://gmr-api.gmr.svc.cluster.local
+    GMR_API_URL=http://fontem-api
 
 EXPOSE 8090
 

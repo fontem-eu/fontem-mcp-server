@@ -1,5 +1,5 @@
 version: "latest"
-gmrApiUrl: "http://gmr-api"
+gmrApiUrl: "http://fontem-api"
 
 # Per-env overlays (prod/claude-proxy.yaml etc.) supply nodeSelector +
 # tolerations to pin to a specific node-pool. Default empty so non-prod

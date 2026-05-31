@@ -57,7 +57,7 @@ cat > "${MCP_CONFIG}" <<EOF
       "command": "node",
       "args": ["${MCP_SERVER_PATH:-/app/src/index.js}"],
       "env": {
-        "GMR_API_URL": "${GMR_API_URL:-http://gmr-api.gmr.svc.cluster.local}"
+        "GMR_API_URL": "${GMR_API_URL:-http://fontem-api}"
       }
     }
   }
