@@ -15,7 +15,7 @@ import { widgetCatalogMarkdown, validateWidget } from './widgets.js'
 import { editActionsCatalogMarkdown, validateEditAction, EDIT_ACTIONS } from './edit-actions.js'
 import { sparqlQuery as sparqlProxy } from './sparql.js'
 
-const GMR_API = process.env.GMR_API_URL || 'http://gmr-api.gmr.svc.cluster.local'
+const GMR_API = process.env.GMR_API_URL || 'http://fontem-api'
 const VIRTUOSO_SPARQL = process.env.VIRTUOSO_SPARQL_URL
   || 'http://virtuoso.fontem-prod.svc.cluster.local:8890/sparql'
 
