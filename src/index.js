@@ -97,8 +97,6 @@ server.resource(
 - SUBSIDIARY_OF — Company → Company (corporate group)
 - AWARDED — Authority → Contract
 - AWARDED_TO — Contract → Company
-- CLIENT_OF — Authority → Company (summary: total contracts + EUR)
-- SUPPLIER_OF — Company → Authority (reverse summary)
 - DIRECTS — Person → Company (role, current)
 - LISTED_AS — Company → Listing
 - REPORTED — Company → FinancialYear
