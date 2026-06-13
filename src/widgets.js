@@ -20,7 +20,6 @@ export const WIDGET_TYPES = {
       depth: { type: 'number', description: 'Traversal depth (1-3)', default: 1 },
       typeFilters: { type: 'object', description: 'Which node types to show, e.g. {Company: true, Contract: false}' },
       timeRange: { type: 'string', description: 'Filter by time: "12m", "3y", "5y", "all"', default: '12m' },
-      summaryEdges: { type: 'boolean', description: 'Show CLIENT_OF/SUPPLIER_OF summary edges', default: true },
     },
     required: ['widget_type', 'entityId'],
     example: '```widget\n{"widget_type": "graph_explorer", "schema_version": 1, "entityId": "ef69a162-e55c-5d6b-a497-f6436c4e050c", "depth": 2}\n```',
