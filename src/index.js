@@ -10,6 +10,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { startHttp } from './http-transport.js'
 import { z } from 'zod'
 import { widgetCatalogMarkdown, validateWidget } from './widgets.js'
 import { editActionsCatalogMarkdown, validateEditAction, EDIT_ACTIONS } from './edit-actions.js'
@@ -688,5 +689,22 @@ Be thorough but concise. Use bullet points. Cite specific entity IDs so the read
 
 // ── Start ────────────────────────────────────────────────────────
 
-const transport = new StdioServerTransport()
-await server.connect(transport)
+// Two transports, same tools.
+//
+//   stdio — a local client spawns this as a subprocess. How it has always
+//           run, and how claude-proxy used it.
+//   http  — Streamable HTTP, so a user can point their OWN client (Claude
+//           Desktop, Claude Code, ChatGPT) at Fontem and have their
+//           subscription pay for the inference.
+//
+// The second exists because the alternative does not: Anthropic prohibited
+// subscription OAuth in third-party tools (2026-02-20) and blocked it
+// (2026-04-04), and OpenAI never offered API access on a ChatGPT plan. A
+// third party cannot spend a user's subscription — but a user's
+// first-party client can call a third party's tools. So we expose the
+// tools instead of embedding a model.
+if ((process.env.MCP_TRANSPORT || 'stdio').toLowerCase() === 'http') {
+  await startHttp(server)
+} else {
+  await server.connect(new StdioServerTransport())
+}
