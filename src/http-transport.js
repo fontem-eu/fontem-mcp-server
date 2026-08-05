@@ -37,12 +37,18 @@ const PATH = process.env.MCP_HTTP_PATH || '/mcp'
 async function resolveUser(token, apiBase) {
   if (!token) return null
   try {
-    const res = await fetch(`${apiBase}/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${apiBase}/assist/mcp-tokens/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
     })
     if (!res.ok) return null
-    return await res.json()
+    const body = await res.json()
+    return body.user_id ? body : null
   } catch {
+    // Network failure resolves to "deny". A tool server that serves
+    // anonymously when its auth backend is unreachable is worse than one
+    // that is briefly unavailable.
     return null
   }
 }
