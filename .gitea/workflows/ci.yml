@@ -46,8 +46,18 @@ jobs:
           repository: void42/ci-actions
           path: .ci-actions
           token: ${{ secrets.CI_READ_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          # node --test's coverage reporters need 22; on 18 the lcov
+          # reporter does not exist and the run produces an empty file.
+          node-version: '22'
       - name: Install dependencies
         run: npm install --ignore-scripts
+      # Sonar had no coverage for this project at all, so any coverage
+      # threshold passed trivially — a condition whose metric is absent
+      # is skipped, not failed.
+      - name: Generate coverage
+        run: npm run test:coverage
       - uses: ./.ci-actions/actions/sonar-scan
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
