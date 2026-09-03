@@ -1,6 +1,6 @@
 /**
  * Widget catalog — describes the embeddable visualizations available
- * in the Fontem data-story editor. The LLM reads this as a resource and
+ * in the Dargle data-story editor. The LLM reads this as a resource and
  * writes widget blocks directly in its responses.
  *
  * Syntax in data stories:
@@ -98,7 +98,7 @@ export function validateWidget(config) {
  * Generate the full widget catalog as a markdown document for the LLM resource.
  */
 export function widgetCatalogMarkdown() {
-  let md = '# Fontem Widget Catalog\n\n'
+  let md = '# Dargle Widget Catalog\n\n'
   md += 'Embed interactive visualizations in data stories using this syntax:\n\n'
   md += '````\n```widget\n{"widget_type": "...", "schema_version": 1, ...}\n```\n````\n\n'
 

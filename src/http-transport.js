@@ -89,7 +89,7 @@ export async function startHttp(server) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
     const user = await resolveUser(token, apiBase)
     if (!user) {
-      unauthorized(res, 'A Fontem access token is required. Create one in Account settings.')
+      unauthorized(res, 'A Dargle access token is required. Create one in Account settings.')
       return
     }
 

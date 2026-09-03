@@ -55,7 +55,7 @@ export async function postSparql(endpoint, query, opts = {}) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/sparql-results+json',
-        'User-Agent': 'Fontem-MCP/1.0 (+https://fontem.eu; team@fontem.eu)',
+        'User-Agent': 'Dargle-MCP/1.0 (+https://dargle.eu; team@fontem.eu)',
       },
       body: form.toString(),
     })
