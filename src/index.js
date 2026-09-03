@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * GMR MCP Server — gives LLMs access to the EU Knowledge Graph.
+ * Dargle MCP Server — gives LLMs access to the EU Knowledge Graph.
  *
  * Resources: widget catalog, graph schema, platform guide
  * Tools: search, company, contracts, graph, paths, fundamentals, validate_widget, web_search
@@ -33,7 +33,7 @@ async function webSearch(query) {
   const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'GMR-MCP/1.0 (research assistant)' },
+      headers: { 'User-Agent': 'Dargle-MCP/1.0 (research assistant)' },
     })
     const html = await res.text()
     // Extract result snippets from the HTML
@@ -56,7 +56,7 @@ async function webSearch(query) {
 // ── MCP Server ───────────────────────────────────────────────────
 
 const server = new McpServer({
-  name: 'gmr',
+  name: 'dargle',
   version: '1.0.0',
 })
 
@@ -81,7 +81,7 @@ server.resource(
     contents: [{
       uri: 'gmr://schema/graph',
       mimeType: 'text/markdown',
-      text: `# GMR Knowledge Graph Schema
+      text: `# Dargle Knowledge Graph Schema
 
 ## Node Types
 - **Company** (gmr_id) — 3.4M entities from GLEIF, EDGAR, ESEF. Properties: name, country, lei, vat, active
@@ -121,11 +121,21 @@ server.resource(
     contents: [{
       uri: 'gmr://guide/platform',
       mimeType: 'text/markdown',
-      text: `# GMR Platform Guide
+      text: `# Dargle Platform Guide
 
-GMR is an EU Enterprise Knowledge Graph for democratic transparency.
+Dargle is an EU Enterprise Knowledge Graph for democratic transparency.
 It connects companies, public authorities, elected officials, and lobbyists
 through procurement contracts, corporate structures, and lobbying declarations.
+
+## The name
+The platform is called **Dargle**. Its motto is "Discover. Argue. Learn. Enjoy."
+
+You will see the word "fontem" throughout the plumbing — hostnames like
+fontem.eu, entity IRIs under data.fontem.eu, and service names in tool results
+and error messages. That is the internal name and it is staying; none of it is
+the product's name. Call the platform Dargle when you speak to a user, whatever
+the surrounding machinery calls itself, and do not correct or explain the
+discrepancy unless asked.
 
 ## Data Sources
 - **GLEIF**: 3.4M company entities with LEI, parent-subsidiary relationships
@@ -238,7 +248,7 @@ filtered to the property whitelist we actually use. License: **CC0 1.0**.
 | \`skos:altLabel\` | — | same lang filter |
 | \`schema:description\` | — | same lang filter |
 
-**Joining onto our procurement graph**: most Companies in Fontem have an
+**Joining onto our procurement graph**: most Companies in Dargle have an
 \`lei\` property; \`wdt:P1278\` is the same identifier. The MCP
 \`search_entities\` tool returns Company hits including their LEI; feed it
 into \`sparql_query\` as in the example below.
@@ -358,7 +368,7 @@ SELECT ?title ?total_eur ?coord_label WHERE {
 The point of having everything in one Virtuoso instance is that named-graph
 boundaries don't tax queries. A few patterns to internalize:
 
-**Wikidata QID for a Fontem Company by LEI**:
+**Wikidata QID for a Dargle Company by LEI**:
 \`\`\`sparql
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 SELECT ?company_iri ?qid WHERE {
@@ -451,7 +461,7 @@ server.tool(
 
 server.tool(
   'search_entities',
-  'Search for companies, authorities, persons, or lobbyists by name. Each Company hit is enriched with a Fontem `iri` field (http://data.fontem.eu/id/Company/<uuid>) — copy it into propose_edit action=insert_entity_mention to create an inline chip.',
+  'Search for companies, authorities, persons, or lobbyists by name. Each Company hit is enriched with a graph `iri` field (http://data.fontem.eu/id/Company/<uuid>) — copy it into propose_edit action=insert_entity_mention to create an inline chip.',
   { query: z.string().max(500).describe('Search query'), limit: z.number().int().min(1).max(50).default(5).describe('Max results') },
   async ({ query, limit }) => {
     const raw = await apiCall(`/search?q=${encodeURIComponent(query)}&limit=${limit}`)
@@ -665,14 +675,14 @@ server.tool(
 
 server.prompt(
   'analyze',
-  'Investigate an entity or topic using the GMR knowledge graph',
+  'Investigate an entity or topic using the Dargle knowledge graph',
   { subject: z.string().describe('Entity name, topic, or question to investigate') },
   ({ subject }) => ({
     messages: [{
       role: 'user',
       content: {
         type: 'text',
-        text: `Analyze "${subject}" using the GMR knowledge graph.
+        text: `Analyze "${subject}" using the Dargle knowledge graph.
 
 1. Search for the entity and identify it
 2. Look up its key data (contracts, financials, connections, lobbying)

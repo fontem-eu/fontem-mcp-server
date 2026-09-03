@@ -82,7 +82,7 @@ describe('widgetCatalogMarkdown', () => {
   it('returns a non-empty markdown string', () => {
     const md = widgetCatalogMarkdown()
     assert.ok(md.length > 100)
-    assert.ok(md.includes('# Fontem Widget Catalog'))
+    assert.ok(md.includes('# Dargle Widget Catalog'))
   })
 
   it('includes all widget types', () => {

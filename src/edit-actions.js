@@ -60,7 +60,7 @@ export const EDIT_ACTIONS = {
     description:
       'Insert an inline entity mention chip at the current cursor (or end of body). Renders as a clickable pill that opens a side panel with the entity\'s facts. Use this whenever the prose names a Company / Authority / Person / Lobbyist / NUTSRegion / CohesionProject / SanctionedEntity that\'s in the graph — chips are how a data story stays linked to its sources. Construct `iri` as `http://data.fontem.eu/id/<Class>/<gmr_id>` from the search_entities results.',
     params: {
-      iri: { type: 'string', required: true, description: 'Full Fontem IRI: http://data.fontem.eu/id/<Class>/<uuid>' },
+      iri: { type: 'string', required: true, description: 'Full entity IRI: http://data.fontem.eu/id/<Class>/<uuid>' },
       label: { type: 'string', required: true, description: 'Display label for the chip (e.g. "Siemens AG")' },
     },
     example: {
