@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkReadOnly, MAX_QUERY_CHARS } from '../src/sparql.js'
+import { checkReadOnly, MAX_QUERY_CHARS, postSparql, sparqlQuery } from '../src/sparql.js'
 
 describe('checkReadOnly — happy path', () => {
   it('accepts SELECT', () => {
@@ -123,5 +123,106 @@ describe('checkReadOnly — input validation', () => {
     const padded = q + ' '.repeat(MAX_QUERY_CHARS - q.length)
     assert.equal(padded.length, MAX_QUERY_CHARS)
     assert.equal(checkReadOnly(padded), null)
+  })
+})
+
+describe('postSparql', () => {
+  const ENDPOINT = 'http://virtuoso.example/sparql'
+
+  /** Swap globalThis.fetch for the duration of one call and hand back
+   * whatever the stub was asked to send. No network in unit tests. */
+  async function withFetch(impl, run) {
+    const real = globalThis.fetch
+    const calls = []
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, init })
+      return impl(url, init)
+    }
+    try {
+      return { result: await run(), calls }
+    } finally {
+      globalThis.fetch = real
+    }
+  }
+
+  const ok = (body) => ({ ok: true, status: 200, text: async () => body })
+
+  it('posts the query form-encoded and returns the body verbatim', async () => {
+    const { result, calls } = await withFetch(
+      () => ok('{"results":{"bindings":[]}}'),
+      () => postSparql(ENDPOINT, 'SELECT ?s WHERE { ?s ?p ?o } LIMIT 1'),
+    )
+    assert.equal(result, '{"results":{"bindings":[]}}')
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].url, ENDPOINT)
+    assert.equal(calls[0].init.method, 'POST')
+
+    const form = new URLSearchParams(calls[0].init.body)
+    assert.equal(form.get('query'), 'SELECT ?s WHERE { ?s ?p ?o } LIMIT 1')
+    assert.equal(form.get('format'), 'application/sparql-results+json')
+    assert.equal(form.get('timeout'), '30000')
+  })
+
+  it('identifies itself as Dargle to the endpoint', async () => {
+    // This header is how third-party endpoints (Wikidata) see us, so it
+    // carries the brand. The contact address is deliberately a working
+    // mailbox rather than a matching domain.
+    const { calls } = await withFetch(() => ok('{}'), () =>
+      postSparql(ENDPOINT, 'ASK { ?s ?p ?o }'))
+    const ua = calls[0].init.headers['User-Agent']
+    assert.match(ua, /^Dargle-MCP\//)
+    assert.ok(!/fontem/i.test(ua.split(';')[0]), `product token still says fontem: ${ua}`)
+  })
+
+  it('honours an explicit timeout', async () => {
+    const { calls } = await withFetch(() => ok('{}'), () =>
+      postSparql(ENDPOINT, 'ASK { ?s ?p ?o }', { timeout_ms: 5000 }))
+    assert.equal(new URLSearchParams(calls[0].init.body).get('timeout'), '5000')
+  })
+
+  it('reports a non-ok response as a JSON error with a truncated detail', async () => {
+    const { result } = await withFetch(
+      () => ({ ok: false, status: 400, statusText: 'Bad Request',
+               text: async () => 'x'.repeat(900) }),
+      () => postSparql(ENDPOINT, 'SELECT ?s WHERE { ?s ?p ?o }'),
+    )
+    const err = JSON.parse(result)
+    assert.match(err.error, /SPARQL 400: Bad Request/)
+    assert.equal(err.detail.length, 500)
+  })
+
+  it('reports an unreachable endpoint instead of throwing', async () => {
+    const { result } = await withFetch(
+      () => { throw new Error('ECONNREFUSED') },
+      () => postSparql(ENDPOINT, 'SELECT ?s WHERE { ?s ?p ?o }'),
+    )
+    assert.match(JSON.parse(result).error, /SPARQL unreachable: ECONNREFUSED/)
+  })
+})
+
+describe('sparqlQuery', () => {
+  it('refuses a write query without touching the network', async () => {
+    const real = globalThis.fetch
+    globalThis.fetch = async () => { throw new Error('must not be called') }
+    try {
+      const out = await sparqlQuery('http://virtuoso.example/sparql',
+        'DELETE WHERE { ?s ?p ?o }')
+      assert.match(JSON.parse(out).error, /blocked/i)
+    } finally {
+      globalThis.fetch = real
+    }
+  })
+
+  it('passes a read query through to the endpoint', async () => {
+    const real = globalThis.fetch
+    globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => 'BODY' })
+    try {
+      assert.equal(
+        await sparqlQuery('http://virtuoso.example/sparql', 'ASK { ?s ?p ?o }'),
+        'BODY',
+      )
+    } finally {
+      globalThis.fetch = real
+    }
   })
 })
