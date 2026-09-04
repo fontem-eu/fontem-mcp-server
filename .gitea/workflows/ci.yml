@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # Pin Node 22 so the runner's bundled node version doesn't
           # leak into the build. fontem-web hit this when vite 8 needed
@@ -46,7 +46,7 @@ jobs:
           repository: void42/ci-actions
           path: .ci-actions
           token: ${{ secrets.CI_READ_TOKEN }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # node --test's coverage reporters need 22; on 18 the lcov
           # reporter does not exist and the run produces an empty file.
