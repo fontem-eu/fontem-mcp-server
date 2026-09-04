@@ -15,7 +15,7 @@ jobs:
           # leak into the build. fontem-web hit this when vite 8 needed
           # >=20.19 for `node:util` styleText — the bundled node was
           # older and the suite crashed at startup.
-          node-version: '22'
+          node-version: '24'
       - name: Install dependencies
         run: npm install --ignore-scripts
       - name: Run tests
@@ -50,7 +50,7 @@ jobs:
         with:
           # node --test's coverage reporters need 22; on 18 the lcov
           # reporter does not exist and the run produces an empty file.
-          node-version: '22'
+          node-version: '24'
       - name: Install dependencies
         run: npm install --ignore-scripts
       # Sonar had no coverage for this project at all, so any coverage
